@@ -3,3 +3,5 @@ pandas
 python-dotenv
 streamlit
 plotly
+flask
+requests
