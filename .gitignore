@@ -1,0 +1,33 @@
+# Virtual environment
+venv/
+env/
+ENV/
+
+# Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+greenify.db
+
+# Secrets & Environment variables
+.env
+.spotify_cache
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Streamlit
+.streamlit/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Large checkpoints / temporary data files
+lastfm_checkpoint.json
