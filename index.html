@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Greentify — Music Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:         #080c09;
+  --sidebar-bg: rgba(8,13,10,0.75);
+  --card-bg:    rgba(12,18,14,0.65);
+  --glass:      rgba(255,255,255,0.025);
+  --glass-h:    rgba(255,255,255,0.05);
+  --active-bg:  rgba(30,215,96,0.12);
+  --b:          rgba(255,255,255,0.05);
+  --b2:         rgba(255,255,255,0.12);
+  --emerald:    #1ED760;
+  --edim:       rgba(30,215,96,0.1);
+  --t1:         #FFFFFF;
+  --t2:         #8CA090;
+  --t3:         #3E5244;
+  --sw:         216px;
+  --sw-col:     68px;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:100%; height:100%; overflow:hidden; }
+body { font-family:'Inter',-apple-system,sans-serif; background:var(--bg); color:var(--t1); -webkit-font-smoothing:antialiased; }
+button,input,select { border:none; background:none; font:inherit; color:inherit; cursor:pointer; outline:none; }
+
+/* ── WAVE CANVAS ── */
+#wc { position:fixed; inset:0; z-index:0; pointer-events:none; }
+
+/* ── SHELL ── */
+.shell { position:relative; z-index:10; display:flex; width:100vw; height:100vh; }
+
+/* ── SIDEBAR ── */
+/* ── SIDEBAR ── */
+.sidebar {
+  width:var(--sw); flex-shrink:0;
+  background:var(--sidebar-bg);
+  backdrop-filter:blur(32px) saturate(1.4); -webkit-backdrop-filter:blur(32px) saturate(1.4);
+  border-right:1px solid var(--b);
+  display:flex; flex-direction:column; padding:22px 14px; z-index:50;
+  transition:width 0.24s cubic-bezier(.16,1,.3,1), padding 0.24s;
+  overflow:hidden;
+}
+.sidebar.collapsed {
+  width:var(--sw-col);
+  padding:22px 10px;
+}
+.sb-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:28px; padding:2px 4px;
+}
+.sidebar.collapsed .sb-header {
+  flex-direction:column; gap:14px; padding:0; margin-bottom:24px;
+}
+.sb-logo {
+  display:flex; align-items:center; gap:10px; min-width:0;
+}
+.sidebar.collapsed .sb-logo {
+  justify-content:center; gap:0;
+}
+.sb-logo-ico {
+  width:32px; height:32px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(145deg,#25e868,#0d7a2e);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 3px 12px rgba(30,215,96,0.32);
+}
+.wf { display:flex; align-items:center; gap:2px; }
+.wf b { display:block; width:2.2px; background:#fff; border-radius:1px; }
+.sb-logo-name {
+  font-size:1.15rem; font-weight:700; letter-spacing:-0.02em;
+  white-space:nowrap; overflow:hidden;
+}
+.sb-logo-name s { color:var(--emerald); text-decoration:none; font-style:normal; }
+.sidebar.collapsed .sb-logo-name {
+  display:none;
+}
+
+.sb-toggle-btn {
+  width:28px; height:28px; border-radius:7px;
+  background:rgba(255,255,255,0.03); border:1px solid var(--b);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--t2); cursor:pointer; flex-shrink:0;
+  transition:background 0.18s, color 0.18s, border-color 0.18s;
+}
+.sb-toggle-btn:hover {
+  background:var(--glass-h); color:var(--emerald); border-color:rgba(30,215,96,0.25);
+}
+.sb-toggle-btn svg {
+  width:14px; height:14px; transition:transform 0.24s cubic-bezier(.16,1,.3,1);
+}
+.sidebar.collapsed .sb-toggle-btn svg {
+  transform:rotate(180deg);
+}
+
+.sb-nav { flex:1; display:flex; flex-direction:column; gap:4px; }
+.sb-item {
+  display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:10px;
+  color:var(--t2); font-size:0.92rem; font-weight:500; cursor:pointer; user-select:none;
+  transition:background 0.18s, color 0.18s, border-color 0.18s; border:1px solid transparent;
+  white-space:nowrap; overflow:hidden;
+}
+.sidebar.collapsed .sb-item {
+  justify-content:center; padding:12px 0; gap:0;
+}
+.sb-item svg { width:18px; height:18px; flex-shrink:0; }
+.sb-item-text { transition:opacity 0.2s; }
+.sidebar.collapsed .sb-item-text {
+  display:none;
+}
+.sb-item:hover { background:var(--glass-h); color:var(--t1); }
+.sb-item.active {
+  background:linear-gradient(135deg,rgba(30,215,96,0.15),rgba(30,215,96,0.06));
+  border-color:rgba(30,215,96,0.2); color:var(--emerald);
+}
+.sb-item.active svg { color:var(--emerald); }
+
+/* ── MAIN ── */
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+
+/* ── TOPBAR ── */
+.topbar { display:flex; align-items:center; padding:14px 28px; gap:12px; flex-shrink:0; }
+.tb-search {
+  flex:1; display:flex; align-items:center; gap:8px;
+  background:rgba(255,255,255,0.025); border:1px solid var(--b);
+  border-radius:9px; padding:9px 14px; transition:border-color 0.2s, background 0.2s;
+}
+.tb-search:focus-within { border-color:rgba(30,215,96,0.3); background:rgba(255,255,255,0.04); }
+.tb-search svg { width:14px; height:14px; color:var(--t3); flex-shrink:0; }
+.tb-search input { flex:1; font-size:0.83rem; color:var(--t1); }
+.tb-search input::placeholder { color:var(--t3); }
+.kb { font-size:0.64rem; color:var(--t3); background:rgba(255,255,255,0.04); padding:2px 5px; border-radius:4px; white-space:nowrap; }
+.tb-pills { display:flex; align-items:center; gap:8px; }
+.pill {
+  display:flex; align-items:center; gap:6px;
+  background:rgba(255,255,255,0.03); border:1px solid var(--b);
+  border-radius:8px; padding:7px 12px; font-size:0.76rem; color:var(--t2); white-space:nowrap;
+  transition:border-color 0.18s, color 0.18s;
+}
+.pill:hover { border-color:var(--b2); color:var(--t1); }
+.pill svg { width:13px; height:13px; }
+.adot { width:6px; height:6px; border-radius:50%; background:var(--emerald); box-shadow:0 0 6px var(--emerald); }
+.av { width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,0.04); border:1px solid var(--b); display:flex; align-items:center; justify-content:center; }
+.av svg { width:17px; height:17px; color:var(--t3); }
+
+/* ── SCROLL ── */
+.scroll { flex:1; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; }
+.scroll::-webkit-scrollbar { width:4px; }
+.scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.06); border-radius:2px; }
+
+/* ── PAGE VISIBILITY ── */
+.page { display:none; }
+.page.active { display:flex; }
+#pg-tracks.active, #pg-artists.active { display:block; flex:1; }
+
+/* ══ OVERVIEW ══ */
+#pg-overview {
+  flex:1;
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:36px 32px 52px;
+  text-align:center;
+  box-sizing:border-box;
+  min-height:100%;
+}
+#pg-overview.active { display:flex; }
+
+.ov-inner {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  margin:auto 0;
+  width:100%;
+}
+
+.hero-logo-wrap {
+  display:flex;
+  justify-content:center;
+  margin-bottom:22px;
+}
+.hero-logo-circle {
+  width:68px; height:68px; border-radius:50%;
+  background:linear-gradient(145deg,#25e868,#0d7a2e);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 10px 32px rgba(30,215,96,0.36), 0 0 0 1px rgba(255,255,255,0.2) inset;
+  transition:transform 0.25s, box-shadow 0.25s;
+}
+.hero-logo-circle:hover {
+  transform:scale(1.08);
+  box-shadow:0 14px 40px rgba(30,215,96,0.5), 0 0 0 1px rgba(255,255,255,0.3) inset;
+}
+.hero-wf { display:flex; align-items:center; gap:3px; }
+.hero-wf b { display:block; width:3.5px; background:#fff; border-radius:1.5px; }
+
+.hero { margin-bottom:52px; }
+.hero-title { font-size:5.6rem; font-weight:800; letter-spacing:-0.05em; line-height:1.02; margin-bottom:20px; }
+.hero-title .g { color:var(--emerald); }
+.hero-sub { font-size:1.35rem; font-weight:600; color:var(--t1); margin-bottom:14px; letter-spacing:-0.01em; }
+.hero-desc { font-size:0.98rem; color:var(--t2); line-height:1.75; max-width:560px; margin:0 auto; }
+
+.fc-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:20px; max-width:760px; width:100%; }
+.fc {
+  position:relative; background:var(--card-bg); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,0.06); border-radius:18px;
+  padding:28px 64px 28px 26px; text-align:left; cursor:pointer; overflow:hidden;
+  transition:transform 0.22s cubic-bezier(.16,1,.3,1), border-color 0.22s, background 0.22s, box-shadow 0.22s;
+}
+.fc::before { content:''; position:absolute; inset:0; background:linear-gradient(160deg,rgba(255,255,255,0.02) 0%,transparent 55%); pointer-events:none; }
+.fc:hover { transform:translateY(-5px); border-color:rgba(30,215,96,0.3); background:rgba(15,24,18,0.85); box-shadow:0 24px 56px rgba(0,0,0,0.5); }
+.fc-ico { width:52px; height:52px; border-radius:14px; background:rgba(30,215,96,0.12); border:1px solid rgba(30,215,96,0.22); display:flex; align-items:center; justify-content:center; color:var(--emerald); margin-bottom:20px; }
+.fc-ico svg { width:26px; height:26px; }
+.fc-title { font-size:1.15rem; font-weight:600; color:var(--t1); margin-bottom:8px; }
+.fc-desc { font-size:0.88rem; color:var(--t3); line-height:1.55; }
+.fc-arr { position:absolute; right:22px; top:50%; transform:translateY(-50%); width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; color:var(--t3); transition:background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s; }
+.fc:hover .fc-arr { background:rgba(30,215,96,0.16); border-color:rgba(30,215,96,0.28); color:var(--emerald); transform:translateY(-50%) translateX(3px); }
+.fc-arr svg { width:14px; height:14px; }
+
+/* ══ DASHBOARD SHELL ══ */
+.dash { padding:28px 32px; }
+.dash-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+.ph h1 { font-size:1.75rem; font-weight:600; letter-spacing:-0.03em; margin-bottom:5px; }
+.ph p  { font-size:0.86rem; color:var(--t2); }
+
+/* ── PERIOD CONTROL ── */
+.period-ctrl { display:flex; gap:4px; background:rgba(255,255,255,0.02); border:1px solid var(--b); border-radius:10px; padding:4px; }
+.pc-btn {
+  padding:6px 14px; border-radius:7px; font-size:0.75rem; font-weight:600;
+  color:var(--t3); cursor:pointer; transition:background 0.18s, color 0.18s; white-space:nowrap;
+}
+.pc-btn:hover { color:var(--t2); background:rgba(255,255,255,0.03); }
+.pc-btn.active { background:var(--active-bg); color:var(--emerald); }
+
+/* ── YEAR RANGE SLIDER ── */
+.year-slider { display:flex; flex-direction:column; gap:4px; min-width:270px; }
+.ys-labels { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
+.ys-year {
+  font-size:0.75rem; font-weight:700; color:var(--emerald);
+  background:var(--edim); border:1px solid rgba(30,215,96,0.22);
+  padding:3px 10px; border-radius:6px; min-width:44px; text-align:center;
+  letter-spacing:0.03em; font-variant-numeric:tabular-nums;
+}
+.ys-sep { color:var(--t3); font-size:0.72rem; }
+.ys-track {
+  position:relative; height:6px;
+  background:rgba(255,255,255,0.08); border-radius:3px;
+  margin:10px 0 4px 0;
+}
+.ys-fill {
+  position:absolute; height:100%;
+  background:var(--emerald); border-radius:3px; pointer-events:none;
+}
+.ys-input {
+  position:absolute; left:0; top:0; width:100%; height:6px; margin:0; padding:0;
+  background:transparent; pointer-events:none;
+  -webkit-appearance:none; appearance:none; outline:none;
+}
+.ys-input::-webkit-slider-runnable-track { background:transparent; height:6px; border:none; }
+.ys-input::-moz-range-track { background:transparent; height:6px; border:none; }
+.ys-input::-webkit-slider-thumb {
+  -webkit-appearance:none; pointer-events:all;
+  width:16px; height:16px; border-radius:50%;
+  background:var(--emerald); border:2px solid var(--bg);
+  cursor:ew-resize; transition:transform 0.1s, box-shadow 0.15s;
+  box-shadow:0 0 0 3px rgba(30,215,96,0.18), 0 2px 5px rgba(0,0,0,0.5);
+  margin-top:-5px;
+}
+.ys-input:active::-webkit-slider-thumb {
+  transform:scale(1.2);
+  box-shadow:0 0 0 5px rgba(30,215,96,0.3), 0 2px 6px rgba(0,0,0,0.6);
+}
+.ys-input::-moz-range-thumb {
+  pointer-events:all; width:16px; height:16px; border-radius:50%;
+  background:var(--emerald); border:2px solid var(--bg); cursor:ew-resize;
+  box-shadow:0 0 0 3px rgba(30,215,96,0.18), 0 2px 5px rgba(0,0,0,0.5);
+}
+/* Light theme slider border fix */
+[data-theme="light"] .ys-track { background:rgba(0,0,0,0.08); }
+[data-theme="light"] .ys-input::-webkit-slider-thumb { border-color:#eef5ef; box-shadow:0 0 0 3px rgba(22,163,74,0.18), 0 2px 4px rgba(0,0,0,0.15); }
+[data-theme="light"] .ys-input::-moz-range-thumb { border-color:#eef5ef; box-shadow:0 0 0 3px rgba(22,163,74,0.18), 0 2px 4px rgba(0,0,0,0.15); }
+
+/* ── STAT CARDS ── */
+.stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+.stat-row-2 { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:20px; max-width:520px; }
+.stat-card {
+  background:var(--glass); border:1px solid var(--b); border-radius:16px;
+  padding:18px 20px; position:relative; overflow:hidden; transition:transform 0.2s, border-color 0.2s;
+}
+.stat-card::after { content:''; position:absolute; top:0; left:20%; right:20%; height:1px; background:linear-gradient(90deg,transparent,rgba(30,215,96,0.4),transparent); }
+.stat-card:hover { transform:translateY(-2px); border-color:rgba(30,215,96,0.2); }
+.sc-icon { width:28px; height:28px; border-radius:8px; background:var(--edim); display:flex; align-items:center; justify-content:center; color:var(--emerald); margin-bottom:12px; }
+.sc-icon svg { width:14px; height:14px; }
+.sc-lbl { font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--t3); margin-bottom:5px; }
+.sc-val { font-size:1.75rem; font-weight:700; letter-spacing:-0.04em; line-height:1; }
+.sc-sub { font-size:0.72rem; color:var(--t3); margin-top:4px; }
+
+/* ── MINI NAV (Sub-tabs) ── */
+.mini-nav { display:flex; gap:6px; margin-bottom:24px; background:rgba(255,255,255,0.02); padding:5px; border-radius:12px; border:1px solid var(--b); overflow-x:auto; flex-shrink:0; }
+.mini-nav::-webkit-scrollbar { display:none; }
+.mn-item { padding:7px 16px; border-radius:8px; font-size:0.78rem; font-weight:500; color:var(--t2); cursor:pointer; white-space:nowrap; transition:background 0.2s, color 0.2s; }
+.mn-item.active { background:var(--active-bg); color:var(--emerald); }
+
+/* ── TAB & CONTROLS ROW ── */
+.tab-row {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px; margin-bottom:24px; flex-wrap:wrap;
+}
+.tab-row .mini-nav { margin-bottom:0; }
+
+/* Tab panels */
+.tab-pane { display:none; animation:fadeIn 0.25s ease forwards; }
+.tab-pane.active { display:block; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── CHART CARDS ── */
+.chart-card { background:var(--glass); border:1px solid var(--b); border-radius:16px; padding:20px; margin-bottom:14px; }
+.chart-card:hover { border-color:rgba(255,255,255,0.09); }
+.ch-header { display:flex; align-items:center; gap:8px; margin-bottom:16px; }
+.ch-header svg { width:14px; height:14px; color:var(--emerald); }
+.ch-title { font-size:0.74rem; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--t3); }
+/* Fixed-height chart wrapper — prevents overflow */
+.ch-wrap { position:relative; width:100%; height:320px; }
+.ch-wrap canvas { position:absolute; inset:0; width:100% !important; height:100% !important; }
+/* Tall variant for long horizontal bar charts (Top Artists) */
+.ch-wrap-tall { position:relative; width:100%; height:480px; }
+.ch-wrap-tall canvas { position:absolute; inset:0; width:100% !important; height:100% !important; }
+.donut-wrap { display:flex; align-items:center; justify-content:center; padding:10px 0; height:300px; }
+
+/* Section divider */
+.ssep { display:flex; align-items:center; gap:12px; margin:24px 0 16px; }
+.ssep-line { flex:1; height:1px; background:var(--b); }
+.ssep-lbl { font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--t3); white-space:nowrap; }
+
+/* ── FILTER BAR ── */
+.fbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+.fi { flex:1; max-width:420px; display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.025); border:1px solid var(--b); border-radius:9px; padding:10px 14px; transition:border-color 0.2s; }
+.fi:focus-within { border-color:rgba(30,215,96,0.28); }
+.fi svg { width:14px; height:14px; color:var(--t3); flex-shrink:0; }
+.fi input { flex:1; font-size:0.85rem; color:var(--t1); }
+.fi input::placeholder { color:var(--t3); }
+.fs { background:rgba(255,255,255,0.025); border:1px solid var(--b); border-radius:9px; padding:10px 12px; color:var(--t2); font-size:0.85rem; }
+.fs option { background:#090e0a; }
+
+/* ── TABLE ── */
+.tpanel { background:rgba(8,13,10,0.55); border:1px solid var(--b); border-radius:14px; overflow:hidden; }
+.gtbl { width:100%; border-collapse:collapse; font-size:0.84rem; }
+.gtbl th { padding:12px 18px; text-align:left; font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--t3); border-bottom:1px solid var(--b); background:rgba(255,255,255,0.01); white-space:nowrap; }
+.gtbl td { padding:11px 18px; color:var(--t2); border-bottom:1px solid rgba(255,255,255,0.025); max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gtbl tr:last-child td { border-bottom:none; }
+.gtbl tr:hover td { background:rgba(255,255,255,0.02); color:var(--t1); }
+.tb { color:var(--t1) !important; font-weight:500; }
+.mt { color:var(--t3); font-size:0.75rem; }
+.bd { padding:3px 9px; border-radius:20px; font-size:0.68rem; font-weight:600; }
+.be { background:rgba(255,55,55,0.11); color:#ff5252; }
+.bc { background:var(--edim); color:var(--emerald); }
+.es { padding:50px 0; text-align:center; color:var(--t3); font-size:0.84rem; }
+.es svg { display:block; margin:0 auto 10px; width:26px; height:26px; opacity:.4; }
+
+/* ── LOGO SEARCH LOADER ── */
+.logo-loader {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:48px 0; gap:14px;
+}
+.ll-ico {
+  width:44px; height:44px; border-radius:50%;
+  background:linear-gradient(145deg, #25e868, #0d7a2e);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 18px rgba(30,215,96,0.35);
+  position:relative;
+  transition:none !important;
+}
+.ll-ico::before {
+  content:''; position:absolute; inset:-4px; border-radius:50%;
+  border:1.5px solid var(--emerald);
+  animation:llRing 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  transition:none !important;
+}
+@keyframes llRing {
+  0%   { transform:scale(0.85); opacity:0.85; }
+  100% { transform:scale(1.36); opacity:0; }
+}
+.ll-wf {
+  display:flex; align-items:center; gap:2.8px; height:22px;
+}
+.ll-wf b {
+  display:block; width:3px; background:#ffffff; border-radius:1.5px;
+  transform-origin:center;
+  animation:llWave 0.95s ease-in-out infinite alternate;
+  transition:none !important;
+}
+.ll-wf b:nth-child(1) { height:9px;  animation-delay:0.0s; }
+.ll-wf b:nth-child(2) { height:16px; animation-delay:0.18s; }
+.ll-wf b:nth-child(3) { height:22px; animation-delay:0.36s; }
+.ll-wf b:nth-child(4) { height:16px; animation-delay:0.15s; }
+.ll-wf b:nth-child(5) { height:9px;  animation-delay:0.32s; }
+
+@keyframes llWave {
+  0%   { transform:scaleY(0.3); opacity:0.65; }
+  100% { transform:scaleY(1.05); opacity:1; }
+}
+
+.ll-txt {
+  font-size:0.83rem; font-weight:500; color:var(--t2);
+  display:flex; align-items:center; gap:2px;
+}
+.ll-dots { display:inline-flex; }
+.ll-dots span {
+  animation:llDot 1.4s infinite; opacity:0;
+  transition:none !important;
+}
+.ll-dots span:nth-child(1) { animation-delay:0s; }
+.ll-dots span:nth-child(2) { animation-delay:0.22s; }
+.ll-dots span:nth-child(3) { animation-delay:0.44s; }
+@keyframes llDot {
+  0%, 20%  { opacity:0; }
+  45%      { opacity:1; }
+  80%,100% { opacity:0; }
+}
+
+/* ── ARTIST GRID ── */
+.agrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:14px; }
+.acard { background:var(--glass); border:1px solid var(--b); border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:12px; transition:transform 0.2s, border-color 0.2s; }
+.acard:hover { transform:translateY(-3px); border-color:rgba(255,255,255,0.12); }
+.aav { width:42px; height:42px; flex-shrink:0; border-radius:50%; background:rgba(30,215,96,0.08); border:1px solid rgba(30,215,96,0.15); display:flex; align-items:center; justify-content:center; font-size:0.95rem; font-weight:600; color:var(--emerald); }
+.aname { font-size:0.88rem; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.acnt { font-size:0.76rem; color:var(--t3); }
+.acnt strong { color:var(--emerald); }
+.abg { height:3px; background:rgba(255,255,255,0.05); border-radius:2px; overflow:hidden; }
+.afill { height:100%; background:var(--emerald); border-radius:2px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width:1100px) { .stat-row { grid-template-columns:repeat(2,1fr); } }
+@media (max-width:700px) { .fc-grid { grid-template-columns:1fr; } .stat-row { grid-template-columns:1fr; } .stat-row-2 { grid-template-columns:1fr; } .dash { padding:16px; } .dash-header { flex-direction:column; } }
+
+/* ── THEME TRANSITION ── */
+*, *::before, *::after { transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease; }
+/* override for elements that need faster transitions */
+.sb-item, .mn-item, .pc-btn, .fc, .stat-card, .acard, .chart-card, .pill { transition: all 0.2s ease !important; }
+
+/* ── THEME TOGGLE BUTTON ── */
+.theme-btn {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--b);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--t2);
+  transition: background 0.2s, border-color 0.2s, color 0.2s !important;
+}
+.theme-btn:hover { background: var(--glass-h); border-color: var(--b2); color: var(--t1); }
+.theme-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+/* Show correct icon per theme */
+.moon-icon { display: block; }
+.sun-icon  { display: none; }
+[data-theme="light"] .moon-icon { display: none; }
+[data-theme="light"] .sun-icon  { display: block; }
+
+/* ══════════════════════════════════════════════════════
+   LIGHT THEME OVERRIDES
+══════════════════════════════════════════════════════ */
+[data-theme="light"] {
+  --bg:         #eef5ef;
+  --sidebar-bg: rgba(228,242,230,0.88);
+  --card-bg:    rgba(255,255,255,0.75);
+  --glass:      rgba(255,255,255,0.65);
+  --glass-h:    rgba(255,255,255,0.90);
+  --active-bg:  rgba(22,163,74,0.10);
+  --b:          rgba(0,0,0,0.07);
+  --b2:         rgba(0,0,0,0.16);
+  --emerald:    #16a34a;
+  --edim:       rgba(22,163,74,0.10);
+  --t1:         #0c1f0e;
+  --t2:         #3d6645;
+  --t3:         #7a9e80;
+}
+
+/* Light: body bg */
+[data-theme="light"] body { background: #eef5ef; }
+
+/* Light: sidebar */
+[data-theme="light"] .sidebar { background: rgba(228,242,230,0.88); border-right-color: rgba(0,0,0,0.07); }
+[data-theme="light"] .sb-toggle-btn { background: rgba(255,255,255,0.6); border-color: rgba(0,0,0,0.08); color: var(--t2); }
+[data-theme="light"] .sb-toggle-btn:hover { background: rgba(255,255,255,0.95); color: var(--emerald); border-color: rgba(22,163,74,0.3); }
+
+/* Light: search box */
+[data-theme="light"] .tb-search { background: rgba(255,255,255,0.6); }
+[data-theme="light"] .tb-search:focus-within { background: rgba(255,255,255,0.9); }
+
+/* Light: pills */
+[data-theme="light"] .pill { background: rgba(255,255,255,0.55); }
+[data-theme="light"] .av   { background: rgba(255,255,255,0.55); }
+[data-theme="light"] .theme-btn { background: rgba(255,255,255,0.55); }
+
+/* Light: kb shortcut */
+[data-theme="light"] .kb { background: rgba(0,0,0,0.06); }
+
+/* Light: scroll area */
+[data-theme="light"] .scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); }
+
+/* Light: mini-nav */
+[data-theme="light"] .mini-nav { background: rgba(255,255,255,0.4); }
+
+/* Light: period ctrl */
+[data-theme="light"] .period-ctrl { background: rgba(255,255,255,0.4); }
+
+/* Light: table */
+[data-theme="light"] .tpanel { background: rgba(255,255,255,0.6); }
+[data-theme="light"] .gtbl td { border-bottom-color: rgba(0,0,0,0.04); }
+[data-theme="light"] .gtbl tr:hover td { background: rgba(0,0,0,0.02); }
+[data-theme="light"] .bc { background: rgba(22,163,74,0.10); }
+[data-theme="light"] .be { background: rgba(239,68,68,0.10); }
+
+/* Light: hero cards */
+[data-theme="light"] .fc { background: rgba(255,255,255,0.75); border-color: rgba(0,0,0,0.07); }
+[data-theme="light"] .fc:hover { background: rgba(255,255,255,0.95); }
+[data-theme="light"] .fc::before { background: linear-gradient(160deg,rgba(255,255,255,0.6) 0%,transparent 55%); }
+[data-theme="light"] .fc-arr { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.07); }
+
+/* Light: stat cards */
+[data-theme="light"] .stat-card::after { background: linear-gradient(90deg,transparent,rgba(22,163,74,0.35),transparent); }
+[data-theme="light"] .acard:hover { border-color: rgba(0,0,0,0.14); }
+
+/* Light: chart cards */
+[data-theme="light"] .chart-card { background: rgba(255,255,255,0.65); }
+
+/* Light: artist bar */
+[data-theme="light"] .abg { background: rgba(0,0,0,0.06); }
+
+/* Light: overview bg — lighter gradient area so waves show softly */
+[data-theme="light"] #pg-overview { background: transparent; }
+</style>
+</head>
+<body>
+
+<canvas id="wc"></canvas>
+
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-header">
+      <div class="sb-logo" onclick="go('overview')" style="cursor:pointer;" title="Greentify Overview">
+        <div class="sb-logo-ico">
+          <div class="wf">
+            <b style="height:6px"></b><b style="height:11px"></b>
+            <b style="height:16px"></b><b style="height:11px"></b><b style="height:6px"></b>
+          </div>
+        </div>
+        <div class="sb-logo-name">Green<s>tify</s></div>
+      </div>
+      <button class="sb-toggle-btn" onclick="toggleSidebar()" title="Toggle sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-item active" data-pg="overview" onclick="go('overview')" title="Overview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span class="sb-item-text">Overview</span>
+      </div>
+      <div class="sb-item" data-pg="tracks" onclick="go('tracks')" title="Tracks">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span class="sb-item-text">Tracks</span>
+      </div>
+      <div class="sb-item" data-pg="artists" onclick="go('artists')" title="Artists">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="sb-item-text">Artists</span>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <div class="tb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="gsearch" type="text" placeholder="Search artists, tracks, genres..." autocomplete="off">
+        <span class="kb">⌘ K</span>
+      </div>
+      <div class="tb-pills">
+        <!-- Theme toggle -->
+        <div class="theme-btn" onclick="toggleTheme()" title="Toggle theme">
+          <!-- Moon = shown in dark mode -->
+          <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <!-- Sun = shown in light mode -->
+          <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </div>
+        <div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      </div>
+    </header>
+
+    <div class="scroll">
+
+      <!-- ════════════ OVERVIEW ════════════ -->
+      <div id="pg-overview" class="page active">
+        <div class="ov-inner">
+          <div class="hero-logo-wrap">
+            <div class="hero-logo-circle">
+              <div class="wf hero-wf">
+                <b style="height:10px"></b><b style="height:18px"></b>
+                <b style="height:26px"></b><b style="height:18px"></b><b style="height:10px"></b>
+              </div>
+            </div>
+          </div>
+          <div class="hero">
+            <h1 class="hero-title">Green<span class="g">tify</span></h1>
+            <div class="hero-sub">Spotify music data analytics platform</div>
+            <div class="hero-desc">Explore charts, artists, tracks, genres and global trends with powerful data insights.</div>
+          </div>
+          <div class="fc-grid">
+            <div class="fc" onclick="go('tracks')">
+              <div class="fc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+              <div class="fc-title">Tracks</div>
+              <div class="fc-desc">Analyze track performance, popularity and audio features.</div>
+              <div class="fc-arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg></div>
+            </div>
+            <div class="fc" onclick="go('artists')">
+              <div class="fc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+              <div class="fc-title">Artists</div>
+              <div class="fc-desc">Discover artist growth and audience insights.</div>
+              <div class="fc-arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════ TRACKS DASHBOARD ════════════ -->
+      <div id="pg-tracks" class="page">
+        <div class="dash">
+
+          <!-- Header -->
+          <div class="dash-header">
+            <div class="ph">
+              <h1>Tracks</h1>
+              <p>Explore 1.2M tracks — distribution, trends and search</p>
+            </div>
+          </div>
+
+          <!-- Stat Cards -->
+          <div class="stat-row">
+            <div class="stat-card">
+              <div class="sc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+              <div class="sc-lbl">Total Tracks</div>
+              <div class="sc-val" id="sc-tracks">—</div>
+              <div class="sc-sub">in the dataset</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+              <div class="sc-lbl">Artists</div>
+              <div class="sc-val" id="sc-artists">—</div>
+              <div class="sc-sub">unique artists</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+              <div class="sc-lbl">Avg Duration</div>
+              <div class="sc-val" id="sc-duration">—</div>
+              <div class="sc-sub">minutes per track</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
+              <div class="sc-lbl">Explicit</div>
+              <div class="sc-val" id="sc-explicit">—</div>
+              <div class="sc-sub">explicit tracks</div>
+            </div>
+          </div>
+
+          <!-- Mini Section Tabs & Timeline Slider -->
+          <div class="tab-row">
+            <div class="mini-nav" id="tr-tabs">
+              <div class="mn-item active" data-tab="tr-search" onclick="switchTab('tr','tr-search')">Search</div>
+              <div class="mn-item" data-tab="tr-artists" onclick="switchTab('tr','tr-artists')">Top Artists</div>
+              <div class="mn-item" data-tab="tr-content" onclick="switchTab('tr','tr-content')">Content Split</div>
+              <div class="mn-item" data-tab="tr-timeline" onclick="switchTab('tr','tr-timeline')">Release Timeline</div>
+              <div class="mn-item" data-tab="tr-duration" onclick="switchTab('tr','tr-duration')">Duration Distribution</div>
+            </div>
+            <div class="year-slider">
+              <div class="ys-labels">
+                <span class="ys-year" id="tr-y1">1960</span>
+                <span class="ys-sep">→</span>
+                <span class="ys-year" id="tr-y2">2024</span>
+              </div>
+              <div class="ys-track">
+                <div class="ys-fill" id="tr-yf"></div>
+                <input type="range" class="ys-input" id="tr-ymin" min="1960" max="2024" value="1960">
+                <input type="range" class="ys-input" id="tr-ymax" min="1960" max="2024" value="2024">
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Search -->
+          <div id="tr-search" class="tab-pane active">
+            <div class="fbar">
+              <div class="fi">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="tq" type="text" placeholder="Search track name or artist..." autocomplete="off">
+              </div>
+              <select class="fs" id="tlim">
+                <option value="50">50 Rows</option>
+                <option value="100">100 Rows</option>
+                <option value="200">200 Rows</option>
+              </select>
+            </div>
+            <div class="tpanel">
+              <table class="gtbl">
+                <thead><tr><th style="width:40px">#</th><th>Track</th><th>Artist</th><th>Genres</th><th>Album</th><th>Duration</th><th>Content</th></tr></thead>
+                <tbody id="tbody">
+                  <tr><td colspan="7"><div class="es"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>Type to search tracks</div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TAB: Top Artists -->
+          <div id="tr-artists" class="tab-pane">
+            <div class="chart-card">
+              <div class="ch-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <span class="ch-title">Top Artists by Track Count</span>
+              </div>
+              <div class="ch-wrap-tall"><canvas id="ch-topartists"></canvas></div>
+            </div>
+          </div>
+
+          <!-- TAB: Content Split -->
+          <div id="tr-content" class="tab-pane">
+            <div class="chart-card" style="max-width:480px; margin:0 auto;">
+              <div class="ch-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                <span class="ch-title">Content Split — Clean vs Explicit</span>
+              </div>
+              <div class="donut-wrap"><canvas id="ch-explicit"></canvas></div>
+            </div>
+          </div>
+
+          <!-- TAB: Release Timeline -->
+          <div id="tr-timeline" class="tab-pane">
+            <div class="chart-card">
+              <div class="ch-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <span class="ch-title">Release Timeline — Tracks per Year</span>
+              </div>
+              <div class="ch-wrap"><canvas id="ch-yearly"></canvas></div>
+            </div>
+          </div>
+
+          <!-- TAB: Duration Distribution -->
+          <div id="tr-duration" class="tab-pane">
+            <div class="chart-card">
+              <div class="ch-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="ch-title">Duration Distribution (0–15 min)</span>
+              </div>
+              <div class="ch-wrap"><canvas id="ch-duration"></canvas></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ════════════ ARTISTS DASHBOARD ════════════ -->
+      <div id="pg-artists" class="page">
+        <div class="dash">
+
+          <!-- Header + Period Controls -->
+          <div class="dash-header">
+            <div class="ph">
+              <h1>Artists</h1>
+              <p>Top artists ranked by track count in the dataset</p>
+            </div>
+            <div class="period-ctrl" id="ar-period">
+              <div class="pc-btn active" data-period="100" onclick="setArPeriod(this,'100')">Top 100</div>
+              <div class="pc-btn" data-period="50"  onclick="setArPeriod(this,'50')">Top 50</div>
+              <div class="pc-btn" data-period="20"  onclick="setArPeriod(this,'20')">Top 20</div>
+              <div class="pc-btn" data-period="10"  onclick="setArPeriod(this,'10')">Top 10</div>
+            </div>
+          </div>
+
+          <!-- Stat Cards -->
+          <div class="stat-row-2">
+            <div class="stat-card">
+              <div class="sc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+              <div class="sc-lbl">Total Artists</div>
+              <div class="sc-val" id="sc-ar-total">—</div>
+              <div class="sc-sub">unique artists</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+              <div class="sc-lbl">Top Artist</div>
+              <div class="sc-val" id="sc-ar-top">—</div>
+              <div class="sc-sub" id="sc-ar-topname">most tracks</div>
+            </div>
+          </div>
+
+          <!-- Mini Section Tabs & Timeline Slider -->
+          <div class="tab-row">
+            <div class="mini-nav" id="ar-tabs">
+              <div class="mn-item active" data-tab="ar-chart" onclick="switchTab('ar','ar-chart')">Top Artists Chart</div>
+              <div class="mn-item" data-tab="ar-browse" onclick="switchTab('ar','ar-browse')">Browse Artists</div>
+            </div>
+            <div class="year-slider">
+              <div class="ys-labels">
+                <span class="ys-year" id="ar-y1">1960</span>
+                <span class="ys-sep">→</span>
+                <span class="ys-year" id="ar-y2">2024</span>
+              </div>
+              <div class="ys-track">
+                <div class="ys-fill" id="ar-yf"></div>
+                <input type="range" class="ys-input" id="ar-ymin" min="1960" max="2024" value="1960">
+                <input type="range" class="ys-input" id="ar-ymax" min="1960" max="2024" value="2024">
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Top Artists Chart -->
+          <div id="ar-chart" class="tab-pane active">
+            <div class="chart-card">
+              <div class="ch-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <span class="ch-title" id="ar-chart-title">Top Artists by Track Count</span>
+              </div>
+              <div class="ch-wrap-tall"><canvas id="ch-ar-bar"></canvas></div>
+            </div>
+          </div>
+
+          <!-- TAB: Browse Artists -->
+          <div id="ar-browse" class="tab-pane">
+            <div class="fbar">
+              <div class="fi" style="max-width:320px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="aq" type="text" placeholder="Filter artists..." autocomplete="off">
+              </div>
+              <select class="fs" id="alim">
+                <option value="20">Top 20</option>
+                <option value="50">Top 50</option>
+                <option value="100">Top 100</option>
+              </select>
+            </div>
+            <div class="agrid" id="agrid">
+              <div style="grid-column:1/-1">
+                <div class="logo-loader">
+                  <div class="ll-ico">
+                    <div class="ll-wf">
+                      <b></b><b></b><b></b><b></b><b></b>
+                    </div>
+                  </div>
+                  <div class="ll-txt">Loading artists<span class="ll-dots"><span>.</span><span>.</span><span>.</span></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /scroll -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+/* ════ WAVE CANVAS ════════════════════════════════════ */
+(function() {
+  const cv = document.getElementById('wc'), ctx = cv.getContext('2d');
+  let W, H, t = 0;
+  function resize() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+  window.addEventListener('resize', resize); resize();
+  function band(yF,amp,freq,phase,r,g,b,a) {
+    const y = H*yF; ctx.beginPath(); ctx.moveTo(-10,H+10);
+    for(let x=0;x<=W+10;x+=3) ctx.lineTo(x, y+amp*Math.sin((x/W)*freq*Math.PI*2+phase+t));
+    ctx.lineTo(W+10,H+10); ctx.closePath(); ctx.fillStyle=`rgba(${r},${g},${b},${a})`; ctx.fill();
+  }
+  function draw() {
+    const ws = window._waveState || { waves:[], bg:'#080c09', glow:'rgba(30,215,96,0.10)' };
+    ctx.fillStyle = ws.bg; ctx.fillRect(0,0,W,H);
+    ws.waves.forEach(w => band(...w));
+    // Glow
+    const g1 = ctx.createRadialGradient(W*.78,H*.15,0,W*.78,H*.15,W*.45);
+    g1.addColorStop(0, ws.glow); g1.addColorStop(.5, ws.glow.replace(/[\d.]+\)$/, '0.02)')); g1.addColorStop(1,'transparent');
+    ctx.fillStyle = g1; ctx.fillRect(0,0,W,H);
+    t += .005; requestAnimationFrame(draw);
+  }
+  // Set initial state before first draw
+  window._waveState = window._waveState || { waves:[[.85,60,1.4,0.0,6,22,12,.45],[.80,50,1.7,0.5,8,32,18,.38],[.75,42,1.9,1.0,10,46,24,.30],[.70,36,2.1,1.5,13,62,32,.24],[.65,30,2.3,2.0,16,80,42,.18],[.60,24,2.6,2.5,20,100,52,.14],[.55,20,2.9,3.0,24,130,66,.11],[.50,16,3.2,3.5,28,160,80,.08],[.38,45,1.2,1.2,6,20,11,.30],[.32,36,1.6,2.2,8,30,17,.22],[.27,28,2.0,3.2,12,50,28,.16],[.22,20,2.4,4.2,16,70,38,.11]], bg:'#080c09', glow:'rgba(30,215,96,0.10)' };
+  draw();
+})();
+
+/* ════ CHART.JS GLOBALS ════════════════════════════════ */
+Chart.defaults.font.family = "'Inter',-apple-system,sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = '#3E5244';
+const TIP = { backgroundColor:'rgba(8,13,10,0.95)', borderColor:'rgba(30,215,96,0.2)', borderWidth:1, titleColor:'#fff', bodyColor:'#8CA090', padding:12, cornerRadius:8, displayColors:false };
+const GRID = { color:'rgba(255,255,255,0.04)', drawBorder:false };
+const AX = { grid:GRID, ticks:{color:'#3E5244'}, border:{color:'transparent'} };
+
+/* ════ HELPERS & STATIC CLIENT DATA STORE ══════════════ */
+const $ = id => document.getElementById(id);
+const fmt = n => Number(n).toLocaleString();
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const renderLogoLoader = (text = 'Searching') => `
+  <div class="logo-loader">
+    <div class="ll-ico">
+      <div class="ll-wf">
+        <b></b><b></b><b></b><b></b><b></b>
+      </div>
+    </div>
+    <div class="ll-txt">${esc(text)}<span class="ll-dots"><span>.</span><span>.</span><span>.</span></span></div>
+  </div>`;
+
+// Client data store for GitHub Pages static execution
+let _staticDB = null;
+async function loadStaticDB() {
+  if (_staticDB) return _staticDB;
+  try {
+    const res = await fetch('data/dataset.json');
+    if (res.ok) {
+      _staticDB = await res.json();
+    }
+  } catch (err) {
+    console.warn('Static data bundle could not be loaded, using fallback API:', err);
+  }
+  return _staticDB;
+}
+
+// Universal API client: calls backend in Flask if available, or evaluates on client dataset for GitHub Pages
+const api = async u => {
+  // Try backend first if running locally with server
+  const isLocalServer = window.location.protocol === 'http:' && (window.location.port === '5000' || window.location.port === '8000');
+  if (isLocalServer) {
+    try {
+      const resp = await fetch(u);
+      if (resp.ok) return await resp.json();
+    } catch (_) {}
+  }
+
+  // Fallback to static in-browser data engine for GitHub Pages
+  const db = await loadStaticDB();
+  if (!db) {
+    try {
+      const resp = await fetch(u);
+      return await resp.json();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  const url = new URL(u, window.location.origin);
+  const path = url.pathname;
+  const params = url.searchParams;
+
+  if (path.endsWith('/api/metrics')) {
+    return db.metrics || {};
+  }
+  if (path.endsWith('/api/explicit')) {
+    return db.explicit || [];
+  }
+  if (path.endsWith('/api/duration')) {
+    return (db.duration || []).map(d => ({ duration_min: d }));
+  }
+  if (path.endsWith('/api/yearly')) {
+    const min = parseInt(params.get('min') || '1960');
+    const max = parseInt(params.get('max') || '2026');
+    return (db.yearly || []).filter(y => y.year >= min && y.year <= max);
+  }
+  if (path.endsWith('/api/top-artists')) {
+    const n = parseInt(params.get('n') || '15');
+    const minYear = parseInt(params.get('min_year') || '1960');
+    const maxYear = parseInt(params.get('max_year') || '2024');
+    const isFiltered = minYear > 1960 || maxYear < 2024;
+
+    if (!isFiltered) {
+      return (db.top_artists || []).slice(0, n);
+    }
+    // Calculate from artist_yearly breakdown
+    const map = new Map();
+    (db.artist_yearly || []).forEach(row => {
+      if (row.year >= minYear && row.year <= maxYear) {
+        map.set(row.artist, (map.get(row.artist) || 0) + row.track_count);
+      }
+    });
+    const sorted = Array.from(map.entries())
+      .map(([artist, track_count]) => ({ artist, track_count }))
+      .sort((a, b) => b.track_count - a.track_count)
+      .slice(0, n);
+    return sorted.length ? sorted : (db.top_artists || []).slice(0, n);
+  }
+  if (path.endsWith('/api/artists')) {
+    const n = parseInt(params.get('n') || '20');
+    const q = (params.get('q') || '').trim().toLowerCase();
+    const minYear = parseInt(params.get('min_year') || '1960');
+    const maxYear = parseInt(params.get('max_year') || '2024');
+    let list = db.top_artists || [];
+    if (q) {
+      list = list.filter(a => a.artist.toLowerCase().includes(q) || (a.genres && a.genres.toLowerCase().includes(q)));
+    }
+    if (minYear > 1960 || maxYear < 2024) {
+      const yearMap = new Map();
+      (db.artist_yearly || []).forEach(row => {
+        if (row.year >= minYear && row.year <= maxYear) {
+          yearMap.set(row.artist, (yearMap.get(row.artist) || 0) + row.track_count);
+        }
+      });
+      list = list.map(a => ({
+        ...a,
+        track_count: yearMap.has(a.artist) ? yearMap.get(a.artist) : Math.round(a.track_count * 0.4)
+      })).filter(a => a.track_count > 0);
+    }
+    return list.slice(0, n);
+  }
+  if (path.endsWith('/api/search')) {
+    const q = (params.get('q') || '').trim().toLowerCase();
+    const limit = parseInt(params.get('limit') || '50');
+    const minYear = parseInt(params.get('min_year') || '1960');
+    const maxYear = parseInt(params.get('max_year') || '2024');
+    if (!q) return [];
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const results = (db.tracks || []).filter(t => {
+      const str = (t.track + ' ' + t.artist + ' ' + (t.album || '')).toLowerCase();
+      const matchesTokens = tokens.every(tok => str.includes(tok));
+      const matchesYear = (!t.year || (t.year >= minYear && t.year <= maxYear));
+      return matchesTokens && matchesYear;
+    }).slice(0, limit);
+    return results;
+  }
+  return [];
+};
+
+/* ════ ROUTER ═════════════════════════════════════════ */
+const _loaded = {};
+function go(id) {
+  document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`[data-pg="${id}"]`).classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  $('pg-'+id).classList.add('active');
+  if (!_loaded[id]) { _loaded[id] = true; pageInit[id] && pageInit[id](); }
+}
+
+/* ════ TABS ═══════════════════════════════════════════ */
+function switchTab(ns, tabId) {
+  // nav items
+  document.querySelectorAll(`#${ns}-tabs .mn-item`).forEach(el => el.classList.remove('active'));
+  document.querySelector(`#${ns}-tabs [data-tab="${tabId}"]`).classList.add('active');
+  // panes — only toggle panes that belong to this namespace
+  document.querySelectorAll(`[id^="${ns}-"].tab-pane`).forEach(p => p.classList.remove('active'));
+  $(tabId).classList.add('active');
+}
+
+/* ════ PERIOD CONTROLS / YEAR SLIDER ══════════════════ */
+let _trCharts = {};
+
+/* Dual-handle range slider initializer */
+function initYearSlider(minId, maxId, fillId, y1Id, y2Id, onChange) {
+  const minIn = document.getElementById(minId), maxIn = document.getElementById(maxId);
+  const fill = document.getElementById(fillId), y1 = document.getElementById(y1Id), y2 = document.getElementById(y2Id);
+  if (!minIn || !maxIn) return;
+  const MIN = parseInt(minIn.min), MAX = parseInt(minIn.max);
+
+  function update(who) {
+    let lo = parseInt(minIn.value), hi = parseInt(maxIn.value);
+    if (lo > hi) {
+      if (who === 'min') { minIn.value = hi; lo = hi; }
+      else               { maxIn.value = lo; hi = lo; }
+    }
+    const span = MAX - MIN;
+    fill.style.left  = ((lo - MIN) / span * 100) + '%';
+    fill.style.right = ((MAX - hi) / span * 100) + '%';
+    y1.textContent = lo;
+    y2.textContent = hi;
+
+    if (who === 'min' || lo > (MAX + MIN) / 2) {
+      minIn.style.zIndex = '5';
+      maxIn.style.zIndex = '4';
+    } else {
+      maxIn.style.zIndex = '5';
+      minIn.style.zIndex = '4';
+    }
+    return [lo, hi];
+  }
+
+  let _d;
+  minIn.addEventListener('input', () => { const [lo, hi] = update('min'); clearTimeout(_d); _d = setTimeout(() => onChange(lo, hi), 180); });
+  maxIn.addEventListener('input', () => { const [lo, hi] = update('max'); clearTimeout(_d); _d = setTimeout(() => onChange(lo, hi), 180); });
+  minIn.addEventListener('pointerdown', () => { minIn.style.zIndex = '6'; maxIn.style.zIndex = '4'; });
+  maxIn.addEventListener('pointerdown', () => { maxIn.style.zIndex = '6'; minIn.style.zIndex = '4'; });
+  update('max');
+}
+
+function setArPeriod(btn, n) {
+  document.querySelectorAll('#ar-period .pc-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const lo = parseInt(document.getElementById('ar-y1').textContent);
+  const hi = parseInt(document.getElementById('ar-y2').textContent);
+  refreshArChart(n, lo, hi);
+}
+
+/* ════ CHART UPDATE HELPERS ═══════════════════════════ */
+function destroyChart(id) { if (_trCharts[id]) { _trCharts[id].destroy(); delete _trCharts[id]; } }
+
+async function loadTrStaticCharts() {
+  if (!_trCharts['explicit']) {
+    const exp = await api('/api/explicit');
+    _trCharts['explicit'] = new Chart($('ch-explicit'), {
+      type:'doughnut',
+      data:{ labels:exp.map(e=>e.type), datasets:[{ data:exp.map(e=>e.count), backgroundColor:['rgba(30,215,96,0.8)','rgba(255,255,255,0.06)'], borderColor:['rgba(30,215,96,0.4)','rgba(255,255,255,0.08)'], borderWidth:1, hoverOffset:4 }] },
+      options:{ cutout:'68%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:true,position:'bottom',labels:{color:'#8CA090',padding:14,usePointStyle:true,pointStyleWidth:8}}, tooltip:{...TIP,callbacks:{label:c=>{const t=c.dataset.data.reduce((a,b)=>a+b,0);return ` ${c.raw.toLocaleString()} (${(c.raw/t*100).toFixed(1)}%)`;} }} }, scales:{x:{display:false},y:{display:false}} }
+    });
+  }
+
+  if (!_trCharts['duration']) {
+    const dR = await api('/api/duration');
+    const vals = dR.map(d=>d.duration_min).filter(v=>v>0&&v<15);
+    const bins = {}; vals.forEach(v=>{ const b=(Math.floor(v*2)/2).toFixed(1); bins[b]=(bins[b]||0)+1; });
+    const bL = Object.keys(bins).sort((a,b)=>+a-+b);
+    _trCharts['duration'] = new Chart($('ch-duration'), {
+      type:'bar',
+      data:{ labels:bL, datasets:[{ data:bL.map(k=>bins[k]), backgroundColor:'rgba(30,215,96,0.28)', borderColor:'rgba(30,215,96,0.5)', borderWidth:1, borderRadius:3, borderSkipped:false }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{...TIP,callbacks:{title:c=>`${c[0].label} min`,label:c=>` ${c.raw.toLocaleString()} tracks`}}}, scales:{x:{...AX,ticks:{...AX.ticks,maxTicksLimit:16,maxRotation:0}},y:{...AX,ticks:{...AX.ticks,callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}} }
+    });
+  }
+}
+
+async function refreshTrCharts(minYear, maxYear) {
+  minYear = minYear || 1960; maxYear = maxYear || 2024;
+
+  // Run dynamic queries in parallel
+  const [topA, yr] = await Promise.all([
+    api(`/api/top-artists?n=12&min_year=${minYear}&max_year=${maxYear}`),
+    api(`/api/yearly?min=${minYear}&max=${maxYear}`)
+  ]);
+
+  // Update Top Artists chart in-place
+  const taLabels = topA.map(a=>a.artist.length>20?a.artist.slice(0,20)+'…':a.artist);
+  const taData = topA.map(a=>a.track_count);
+  const taColors = topA.map((_,i)=>i===0?'rgba(30,215,96,0.85)':i<3?'rgba(30,215,96,0.55)':'rgba(30,215,96,0.25)');
+
+  if (_trCharts['topartists']) {
+    _trCharts['topartists'].data.labels = taLabels;
+    _trCharts['topartists'].data.datasets[0].data = taData;
+    _trCharts['topartists'].data.datasets[0].backgroundColor = taColors;
+    _trCharts['topartists'].update();
+  } else {
+    _trCharts['topartists'] = new Chart($('ch-topartists'), {
+      type:'bar',
+      data:{ labels:taLabels, datasets:[{ data:taData, backgroundColor:taColors, borderRadius:4, borderSkipped:false }] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{...TIP,callbacks:{label:c=>` ${c.raw.toLocaleString()} tracks`}}}, scales:{x:{...AX,ticks:{...AX.ticks,callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}},y:{...AX}} }
+    });
+  }
+
+  // Update Yearly timeline in-place
+  if (_trCharts['yearly']) {
+    _trCharts['yearly'].data.labels = yr.map(y=>y.year);
+    _trCharts['yearly'].data.datasets[0].data = yr.map(y=>y.track_count);
+    _trCharts['yearly'].update();
+  } else {
+    const cy = $('ch-yearly').getContext('2d');
+    const g3 = cy.createLinearGradient(0,0,0,320);
+    g3.addColorStop(0,'rgba(30,215,96,0.22)'); g3.addColorStop(1,'rgba(30,215,96,0.01)');
+    _trCharts['yearly'] = new Chart(cy, {
+      type:'line',
+      data:{ labels:yr.map(y=>y.year), datasets:[{ data:yr.map(y=>y.track_count), borderColor:'#1ED760', borderWidth:2, backgroundColor:g3, fill:true, tension:0.4, pointRadius:0, pointHoverRadius:4, pointHoverBackgroundColor:'#1ED760' }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{...TIP,callbacks:{label:c=>` ${c.raw.toLocaleString()} tracks`}}}, scales:{x:{...AX,ticks:{...AX.ticks,maxTicksLimit:12,maxRotation:0}},y:{...AX,ticks:{...AX.ticks,callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}} }
+    });
+  }
+}
+
+let _arChart = null;
+async function refreshArChart(n, minYear, maxYear) {
+  n=n||100; minYear=minYear||1960; maxYear=maxYear||2024;
+  const topA = await api(`/api/top-artists?n=${n}&min_year=${minYear}&max_year=${maxYear}`);
+  $('ar-chart-title').textContent = `Top ${n} Artists — ${minYear}–${maxYear}`;
+  const labels = topA.map(a=>a.artist.length>22?a.artist.slice(0,22)+'…':a.artist);
+  const data = topA.map(a=>a.track_count);
+  const colors = topA.map((_,i)=>i===0?'rgba(30,215,96,0.85)':i<3?'rgba(30,215,96,0.55)':'rgba(30,215,96,0.22)');
+
+  if (_arChart) {
+    _arChart.data.labels = labels;
+    _arChart.data.datasets[0].data = data;
+    _arChart.data.datasets[0].backgroundColor = colors;
+    _arChart.update();
+  } else {
+    _arChart = new Chart($('ch-ar-bar'), {
+      type:'bar',
+      data:{ labels, datasets:[{ data, backgroundColor:colors, borderRadius:4, borderSkipped:false }] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{...TIP,callbacks:{label:c=>` ${c.raw.toLocaleString()} tracks`}}}, scales:{x:{...AX,ticks:{...AX.ticks,callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}},y:{...AX}} }
+    });
+  }
+}
+
+/* ════ PAGE INITIALISERS ═══════════════════════════════ */
+const pageInit = {
+  async tracks() {
+    const m = await api('/api/metrics');
+    $('sc-tracks').textContent   = fmt(m.total_tracks);
+    $('sc-artists').textContent  = fmt(m.total_artists);
+    $('sc-duration').textContent = (+m.avg_duration_min).toFixed(1)+'m';
+    $('sc-explicit').textContent = fmt(m.explicit_count);
+    loadTrStaticCharts();
+    initYearSlider('tr-ymin','tr-ymax','tr-yf','tr-y1','tr-y2',(lo,hi)=>{
+      refreshTrCharts(lo,hi);
+      if ($('tq').value.trim()) { searchTracks(); }
+    });
+    await refreshTrCharts(1960, 2024);
+    let _tt;
+    $('tq').addEventListener('input', ()=>{
+      clearTimeout(_tt);
+      if ($('tq').value.trim()) {
+        $('tbody').innerHTML = `<tr><td colspan="7">${renderLogoLoader('Searching tracks')}</td></tr>`;
+      }
+      _tt = setTimeout(searchTracks, 280);
+    });
+    $('tlim').addEventListener('change', searchTracks);
+  },
+
+  async artists() {
+    const m = await api('/api/metrics');
+    $('sc-ar-total').textContent = fmt(m.total_artists);
+    const topA = await api('/api/top-artists?n=1');
+    if (topA.length) { $('sc-ar-top').textContent=fmt(topA[0].track_count); $('sc-ar-topname').textContent=topA[0].artist; }
+    initYearSlider('ar-ymin','ar-ymax','ar-yf','ar-y1','ar-y2',(lo,hi)=>{
+      const n=document.querySelector('#ar-period .pc-btn.active')?.dataset.period||'100';
+      refreshArChart(n,lo,hi); loadArtistGrid();
+    });
+    await refreshArChart(100,1960,2024);
+    loadArtistGrid();
+    let _at;
+    $('aq').addEventListener('input', ()=>{
+      clearTimeout(_at);
+      $('agrid').innerHTML = `<div style="grid-column:1/-1">${renderLogoLoader('Searching artists')}</div>`;
+      _at = setTimeout(loadArtistGrid, 280);
+    });
+    $('alim').addEventListener('change', loadArtistGrid);
+  }
+};
+
+/* ════ TRACKS SEARCH ═══════════════════════════════════ */
+async function searchTracks() {
+  const q = $('tq').value.trim(), lm = $('tlim').value, tb = $('tbody');
+  if (!q) { tb.innerHTML=`<tr><td colspan="7"><div class="es"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>Type to search tracks</div></td></tr>`; return; }
+  tb.innerHTML=`<tr><td colspan="7">${renderLogoLoader('Searching tracks')}</td></tr>`;
+  const lo = parseInt(document.getElementById('tr-y1')?.textContent || '1960');
+  const hi = parseInt(document.getElementById('tr-y2')?.textContent || '2024');
+  const rows = await api(`/api/search?q=${encodeURIComponent(q)}&limit=${lm}&min_year=${lo}&max_year=${hi}`);
+  if (!rows.length) { tb.innerHTML=`<tr><td colspan="7"><div class="es">No results found</div></td></tr>`; return; }
+  tb.innerHTML = rows.map((r,i) => {
+    let gs = r.genres ? esc(r.genres.split(',').slice(0,2).join(', ')) : '—';
+    return `<tr><td class="mt">${i+1}</td><td class="tb">${esc(r.track)}</td><td>${esc(r.artist)}</td><td style="color:var(--t3); font-size:0.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gs}</td><td>${esc(r.album||'—')}</td><td>${r.duration_min} min</td><td><span class="bd ${r.explicit?'be':'bc'}">${r.explicit?'Explicit':'Clean'}</span></td></tr>`;
+  }).join('');
+}
+
+/* ════ ARTIST GRID ════════════════════════════════════ */
+async function loadArtistGrid() {
+  const q = $('aq').value.trim(), n = $('alim').value, grid = $('agrid');
+  const lo = parseInt(document.getElementById('ar-y1')?.textContent || '1960');
+  const hi = parseInt(document.getElementById('ar-y2')?.textContent || '2024');
+  grid.innerHTML=`<div style="grid-column:1/-1">${renderLogoLoader(q ? 'Searching artists' : 'Loading artists')}</div>`;
+  let url = q ? `/api/artists?q=${encodeURIComponent(q)}&n=${n}` : `/api/artists?n=${n}`;
+  url += `&min_year=${lo}&max_year=${hi}`;
+  const data = await api(url);
+  if (!data.length) { grid.innerHTML=`<div class="es" style="grid-column:1/-1">No artists found</div>`; return; }
+  const max = data[0].track_count;
+  grid.innerHTML = data.map(a => {
+    let gs = a.genres ? `<div style="font-size:0.7rem; color:var(--t3); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${esc(a.genres)}">${esc(a.genres.split(',').slice(0,3).join(', '))}</div>` : '';
+    return `<div class="acard">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="aav">${esc(a.artist.charAt(0).toUpperCase())}</div>
+        <div style="min-width:0;">
+          <div class="aname">${esc(a.artist)}</div>
+          <div class="acnt"><strong>${fmt(a.track_count)}</strong> tracks</div>
+          ${gs}
+        </div>
+      </div>
+      <div class="abg"><div class="afill" style="width:${(a.track_count/max*100).toFixed(1)}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ════ GLOBAL SEARCH ══════════════════════════════════ */
+$('gsearch').addEventListener('keydown', e => {
+  if (e.key==='Enter' && e.target.value.trim()) {
+    go('tracks'); switchTab('tr','tr-search');
+    $('tq').value = e.target.value.trim();
+    $('tbody').innerHTML = `<tr><td colspan="7">${renderLogoLoader('Searching tracks')}</td></tr>`;
+    searchTracks();
+    e.target.value='';
+  }
+});
+
+/* ════ THEME TOGGLE ═══════════════════════════════════ */
+const html = document.documentElement;
+
+// Wave palette per theme
+const WAVES_DARK = [
+  [.85,60,1.4,0.0,6,22,12,.45],[.80,50,1.7,0.5,8,32,18,.38],
+  [.75,42,1.9,1.0,10,46,24,.30],[.70,36,2.1,1.5,13,62,32,.24],
+  [.65,30,2.3,2.0,16,80,42,.18],[.60,24,2.6,2.5,20,100,52,.14],
+  [.55,20,2.9,3.0,24,130,66,.11],[.50,16,3.2,3.5,28,160,80,.08],
+  [.38,45,1.2,1.2,6,20,11,.30],[.32,36,1.6,2.2,8,30,17,.22],
+  [.27,28,2.0,3.2,12,50,28,.16],[.22,20,2.4,4.2,16,70,38,.11]
+];
+const WAVES_LIGHT = [
+  [.85,50,1.4,0.0,180,230,190,.30],[.80,40,1.7,0.5,160,215,175,.22],
+  [.75,32,1.9,1.0,140,200,158,.16],[.70,26,2.1,1.5,120,190,145,.12],
+  [.60,20,2.3,2.0,100,180,130,.09],[.50,14,2.8,3.0,80,170,115,.07],
+  [.38,35,1.2,1.2,190,230,200,.18],[.32,25,1.6,2.2,170,215,185,.12],
+  [.27,18,2.0,3.2,150,205,165,.09]
+];
+
+let _waves = WAVES_DARK;
+let _bgFill = '#080c09';
+let _glowColor = 'rgba(30,215,96,0.10)';
+
+// Expose wave state to the canvas draw function
+window._waveState = { waves: _waves, bg: _bgFill, glow: _glowColor };
+
+function toggleTheme() {
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  const next = isDark ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('gt-theme', next);
+
+  if (next === 'light') {
+    window._waveState = { waves: WAVES_LIGHT, bg: '#eef5ef', glow: 'rgba(22,163,74,0.07)' };
+    Chart.defaults.color = '#7a9e80';
+    GRID.color = 'rgba(0,0,0,0.06)';
+    TIP.backgroundColor = 'rgba(245,252,246,0.97)';
+    TIP.titleColor = '#0c1f0e';
+    TIP.bodyColor = '#3d6645';
+    TIP.borderColor = 'rgba(22,163,74,0.2)';
+  } else {
+    window._waveState = { waves: WAVES_DARK, bg: '#080c09', glow: 'rgba(30,215,96,0.10)' };
+    Chart.defaults.color = '#3E5244';
+    GRID.color = 'rgba(255,255,255,0.04)';
+    TIP.backgroundColor = 'rgba(8,13,10,0.95)';
+    TIP.titleColor = '#fff';
+    TIP.bodyColor = '#8CA090';
+    TIP.borderColor = 'rgba(30,215,96,0.2)';
+  }
+
+  // Redraw active charts with new colors
+  Object.keys(_trCharts).forEach(k => destroyChart(k));
+  if (_loaded.tracks) {
+    const lo = parseInt(document.getElementById('tr-y1')?.textContent || '1960');
+    const hi = parseInt(document.getElementById('tr-y2')?.textContent || '2024');
+    loadTrStaticCharts();
+    refreshTrCharts(lo, hi);
+  }
+  if (_arChart) { _arChart.destroy(); _arChart = null; }
+  if (_loaded.artists) {
+    const n = document.querySelector('#ar-period .pc-btn.active')?.dataset.period || '100';
+    const lo = parseInt(document.getElementById('ar-y1')?.textContent || '1960');
+    const hi = parseInt(document.getElementById('ar-y2')?.textContent || '2024');
+    refreshArChart(n, lo, hi);
+  }
+}
+
+// Restore saved theme on load
+(function() {
+  const saved = localStorage.getItem('gt-theme') || 'dark';
+  html.setAttribute('data-theme', saved);
+  if (saved === 'light') {
+    window._waveState = { waves: WAVES_LIGHT, bg: '#eef5ef', glow: 'rgba(22,163,74,0.07)' };
+  } else {
+    window._waveState = { waves: WAVES_DARK, bg: '#080c09', glow: 'rgba(30,215,96,0.10)' };
+  }
+})();
+
+/* ════ SIDEBAR TOGGLE ══════════════════════════════════ */
+function toggleSidebar() {
+  const sb = document.querySelector('.sidebar');
+  if (!sb) return;
+  sb.classList.toggle('collapsed');
+  const isCol = sb.classList.contains('collapsed');
+  localStorage.setItem('gt-sb-col', isCol ? '1' : '0');
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 260);
+}
+
+// Restore sidebar state on load
+(function() {
+  if (localStorage.getItem('gt-sb-col') === '1') {
+    document.querySelector('.sidebar')?.classList.add('collapsed');
+  }
+})();
+
+/* ════ INIT ═══════════════════════════════════════════ */
+go('overview');
+</script>
+</body>
+</html>

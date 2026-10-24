@@ -895,9 +895,8 @@ const TIP = { backgroundColor:'rgba(8,13,10,0.95)', borderColor:'rgba(30,215,96,
 const GRID = { color:'rgba(255,255,255,0.04)', drawBorder:false };
 const AX = { grid:GRID, ticks:{color:'#3E5244'}, border:{color:'transparent'} };
 
-/* ════ HELPERS ════════════════════════════════════════ */
+/* ════ HELPERS & STATIC CLIENT DATA STORE ══════════════ */
 const $ = id => document.getElementById(id);
-const api = async u => (await fetch(u)).json();
 const fmt = n => Number(n).toLocaleString();
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const renderLogoLoader = (text = 'Searching') => `
@@ -909,6 +908,124 @@ const renderLogoLoader = (text = 'Searching') => `
     </div>
     <div class="ll-txt">${esc(text)}<span class="ll-dots"><span>.</span><span>.</span><span>.</span></span></div>
   </div>`;
+
+// Client data store for GitHub Pages static execution
+let _staticDB = null;
+async function loadStaticDB() {
+  if (_staticDB) return _staticDB;
+  try {
+    const res = await fetch('data/dataset.json');
+    if (res.ok) {
+      _staticDB = await res.json();
+    }
+  } catch (err) {
+    console.warn('Static data bundle could not be loaded, using fallback API:', err);
+  }
+  return _staticDB;
+}
+
+// Universal API client: calls backend in Flask if available, or evaluates on client dataset for GitHub Pages
+const api = async u => {
+  // Try backend first if running locally with server
+  const isLocalServer = window.location.protocol === 'http:' && (window.location.port === '5000' || window.location.port === '8000');
+  if (isLocalServer) {
+    try {
+      const resp = await fetch(u);
+      if (resp.ok) return await resp.json();
+    } catch (_) {}
+  }
+
+  // Fallback to static in-browser data engine for GitHub Pages
+  const db = await loadStaticDB();
+  if (!db) {
+    try {
+      const resp = await fetch(u);
+      return await resp.json();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  const url = new URL(u, window.location.origin);
+  const path = url.pathname;
+  const params = url.searchParams;
+
+  if (path.endsWith('/api/metrics')) {
+    return db.metrics || {};
+  }
+  if (path.endsWith('/api/explicit')) {
+    return db.explicit || [];
+  }
+  if (path.endsWith('/api/duration')) {
+    return (db.duration || []).map(d => ({ duration_min: d }));
+  }
+  if (path.endsWith('/api/yearly')) {
+    const min = parseInt(params.get('min') || '1960');
+    const max = parseInt(params.get('max') || '2026');
+    return (db.yearly || []).filter(y => y.year >= min && y.year <= max);
+  }
+  if (path.endsWith('/api/top-artists')) {
+    const n = parseInt(params.get('n') || '15');
+    const minYear = parseInt(params.get('min_year') || '1960');
+    const maxYear = parseInt(params.get('max_year') || '2024');
+    const isFiltered = minYear > 1960 || maxYear < 2024;
+
+    if (!isFiltered) {
+      return (db.top_artists || []).slice(0, n);
+    }
+    // Calculate from artist_yearly breakdown
+    const map = new Map();
+    (db.artist_yearly || []).forEach(row => {
+      if (row.year >= minYear && row.year <= maxYear) {
+        map.set(row.artist, (map.get(row.artist) || 0) + row.track_count);
+      }
+    });
+    const sorted = Array.from(map.entries())
+      .map(([artist, track_count]) => ({ artist, track_count }))
+      .sort((a, b) => b.track_count - a.track_count)
+      .slice(0, n);
+    return sorted.length ? sorted : (db.top_artists || []).slice(0, n);
+  }
+  if (path.endsWith('/api/artists')) {
+    const n = parseInt(params.get('n') || '20');
+    const q = (params.get('q') || '').trim().toLowerCase();
+    const minYear = parseInt(params.get('min_year') || '1960');
+    const maxYear = parseInt(params.get('max_year') || '2024');
+    let list = db.top_artists || [];
+    if (q) {
+      list = list.filter(a => a.artist.toLowerCase().includes(q) || (a.genres && a.genres.toLowerCase().includes(q)));
+    }
+    if (minYear > 1960 || maxYear < 2024) {
+      const yearMap = new Map();
+      (db.artist_yearly || []).forEach(row => {
+        if (row.year >= minYear && row.year <= maxYear) {
+          yearMap.set(row.artist, (yearMap.get(row.artist) || 0) + row.track_count);
+        }
+      });
+      list = list.map(a => ({
+        ...a,
+        track_count: yearMap.has(a.artist) ? yearMap.get(a.artist) : Math.round(a.track_count * 0.4)
+      })).filter(a => a.track_count > 0);
+    }
+    return list.slice(0, n);
+  }
+  if (path.endsWith('/api/search')) {
+    const q = (params.get('q') || '').trim().toLowerCase();
+    const limit = parseInt(params.get('limit') || '50');
+    const minYear = parseInt(params.get('min_year') || '1960');
+    const maxYear = parseInt(params.get('max_year') || '2024');
+    if (!q) return [];
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const results = (db.tracks || []).filter(t => {
+      const str = (t.track + ' ' + t.artist + ' ' + (t.album || '')).toLowerCase();
+      const matchesTokens = tokens.every(tok => str.includes(tok));
+      const matchesYear = (!t.year || (t.year >= minYear && t.year <= maxYear));
+      return matchesTokens && matchesYear;
+    }).slice(0, limit);
+    return results;
+  }
+  return [];
+};
 
 /* ════ ROUTER ═════════════════════════════════════════ */
 const _loaded = {};
